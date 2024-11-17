@@ -1,6 +1,7 @@
 package server;
 
 import client.MessageHandlerInterface;
+import utils.DatabaseManager;
 
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
@@ -13,6 +14,7 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
 
     //Atributos
     private final Map<MessageHandlerInterface, String> usuariosConectados = new HashMap<>(); //Almacena los usuarios conectados
+    private DatabaseManager dbManager = new DatabaseManager(); //Gestiona la base de datos
 
     //Setters y Getters
     public Map<MessageHandlerInterface, String> getUsuariosConectados() {
@@ -20,8 +22,9 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
     }
 
     //Constructor (RMI)
-    public ServerImpl() throws RemoteException {
+    public ServerImpl(DatabaseManager dbManager) throws RemoteException {
         super();
+        this.dbManager = dbManager;
     }
 
     //Métodos remotos básicos:
@@ -76,28 +79,48 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
     //métodos avanzados (por ahora no tocar)
     //vamos a necesitar conexión con una BBDD para el registro y gestión de amigos. Y para clave.
     //las solicitudes de amistad se pueden mandar aunque no esten en linea
-    public boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException{
-
-        //PRIMERO: Hacer un query a la base de datos para
-
-
-
-        return true;
-    }
-
-    public boolean solicitarAmistad() throws RemoteException{
-        return true;
-    }
-
-    public boolean aceptarAmistad() throws RemoteException{
-        return true;
-    }
-
-    public List<String> obtenerListaAmigos() throws RemoteException{
-        return null;
+    @Override
+    public boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException {
+        if (!dbManager.usuarioExiste(nombreCliente)) {
+            dbManager.addUser(nombreCliente, clave);
+            return true;
+        }
+        return false; // Usuario ya existente
     }
 
 
+    @Override
+    public boolean solicitarAmistad(String usuarioSolicitante, String usuarioReceptor) throws RemoteException {
+        // Verificar si ambos usuarios existen en la base de datos
+        if (dbManager.usuarioExiste(usuarioSolicitante) && dbManager.usuarioExiste(usuarioReceptor)) {
+            dbManager.addFriendRequest(usuarioSolicitante, usuarioReceptor);
+            return true;
+        }
+        return false;
+    }
 
+    @Override
+    public boolean aceptarAmistad(String usuarioSolicitante, String usuarioReceptor) throws RemoteException {
+        // Aceptar la solicitud de amistad en la base de datos
+        if (dbManager.aceptarSolicitudAmistad(usuarioSolicitante, usuarioReceptor)) {
+            // Actualizar amigos conectados (si están en línea)
+            MessageHandlerInterface solicitante = solicitarReferenciaUsuario(usuarioSolicitante);
+            if (solicitante != null) {
+                solicitante.serNotificadoNuevoAmigo(usuarioReceptor);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public List<String> obtenerListaAmigos(String nombreCliente) throws RemoteException {
+        return dbManager.obtenerAmigos(nombreCliente);
+    }
+
+    @Override
+    public List<String> obtenerSolicitudesPendientes(String nombreCliente) throws RemoteException {
+        return dbManager.obtenerSolicitudesPendientes(nombreCliente);
+    }
 
 }

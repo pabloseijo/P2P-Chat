@@ -59,8 +59,6 @@ public class Client {
     }
 
 
-
-
     // Metodo para pedir un puerto válido al que conectarse:
     private static int pedirPuerto(Scanner scanner) {
         int puerto = -1;

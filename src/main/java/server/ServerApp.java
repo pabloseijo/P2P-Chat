@@ -1,5 +1,7 @@
 package server;
 
+import utils.DatabaseManager;
+
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
@@ -10,10 +12,13 @@ public class ServerApp {
     // En el main exportaremos una instancia de ServerImpl.
     public static void main(String[] args) {
         try{
-            //1. Creamos una instancia del servidor (RMI)
-            ServerInterface server = new ServerImpl();
+            // 1. Crear una instancia de DatabaseManager
+            DatabaseManager dbManager = new DatabaseManager();
 
-            //2. Solicitamos el puerto donde se desea exportar el registro RMI y lo creamos.
+            // 2. Crear una instancia del servidor (RMI) pasando la base de datos
+            ServerInterface server = new ServerImpl(dbManager);
+
+            //3. Solicitamos el puerto donde se desea exportar el registro RMI y lo creamos.
             int puerto = pedirPuerto();
             Registry registry;
             try {
@@ -23,7 +28,7 @@ public class ServerApp {
                 registry = LocateRegistry.getRegistry(puerto);
             }
 
-            //3. Registramos la instancia del servidor en el registro RMI con nombre:
+            //4. Registramos la instancia del servidor en el registro RMI con nombre:
             registry.rebind("server", server);
             System.out.println("Servidor RMI iniciado y listo para recibir conexiones.");
 

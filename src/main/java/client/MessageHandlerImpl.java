@@ -6,43 +6,35 @@ import java.util.List;
 
 public class MessageHandlerImpl extends UnicastRemoteObject implements MessageHandlerInterface {
 
-    //Constructor
+    // Constructor
     public MessageHandlerImpl() throws RemoteException {
         super();
     }
 
-    //probablemente haya que añadir getters para nombres y otras cosas.
-
-
-
     @Override
-    public void recibirMensaje(String mensaje, String usuarioEnvia) throws RemoteException{ //TODO: vamos a tener que poner quien lo manda:
+    public void recibirMensaje(String mensaje, String usuarioEnvia) throws RemoteException {
         System.out.println("\nTe ha llegado un nuevo mensaje de " + usuarioEnvia + ":\n");
         System.out.println(mensaje);
     }
 
-    //Ser notificado usuarios conectados:
     @Override
-    public void serNotificadoUsuariosConectados(List<String> listaUsuariosConectados) throws RemoteException{
-        // Imprimir el encabezado
+    public void serNotificadoUsuariosConectados(List<String> listaUsuariosConectados) throws RemoteException {
         System.out.println("Usuarios online actualmente:");
-
-        // Imprimir cada usuario de la lista
         for (String usuario : listaUsuariosConectados) {
             System.out.println("- " + usuario);
         }
-
-        // Si no hay usuarios en la lista
         if (listaUsuariosConectados.isEmpty()) {
             System.out.println("No hay usuarios conectados en este momento.");
         }
     }
 
-    //Metodo para notificar al resto de clientes de que se conecto un cliente, es un metodo RMI del cliente:
     @Override
-    public void serNotificadoNuevoUsuario(String nombreCliente){
+    public void serNotificadoNuevoUsuario(String nombreCliente) throws RemoteException {
         System.out.println("Nuevo usuario online: " + nombreCliente);
     }
 
-
+    @Override
+    public void serNotificadoNuevoAmigo(String nombreAmigo) throws RemoteException {
+        System.out.println("¡Tienes un nuevo amigo! " + nombreAmigo + " ahora es tu amigo.");
+    }
 }
