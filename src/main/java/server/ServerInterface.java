@@ -19,9 +19,9 @@ public interface ServerInterface extends Remote {
     MessageHandlerInterface solicitarReferenciaUsuario(String nombreUsuario) throws RemoteException; //Devuelve la referencia del objeto rémoto asociado al nombre.
 
 
-    //métodos avanzados (por ahora no tocar) - despues vamos a tener que pedir clave.
-
-    boolean registrarUsuario() throws RemoteException;
+    //métodos avanzados: vamos a tener que pedir clave.
+    boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException; //Usa conectarCliente como metodo auxiliar.
+    //Va a tener que comprobar que no haya clientes ya con el mismo nombre en la bbdd.
 
     boolean solicitarAmistad() throws RemoteException;
 

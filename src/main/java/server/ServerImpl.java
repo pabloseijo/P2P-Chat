@@ -76,7 +76,12 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
     //métodos avanzados (por ahora no tocar)
     //vamos a necesitar conexión con una BBDD para el registro y gestión de amigos. Y para clave.
     //las solicitudes de amistad se pueden mandar aunque no esten en linea
-    public boolean registrarUsuario() throws RemoteException{
+    public boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException{
+
+        //PRIMERO: Hacer un query a la base de datos para
+
+
+
         return true;
     }
 
