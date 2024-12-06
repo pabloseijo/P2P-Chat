@@ -78,7 +78,12 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
     //las solicitudes de amistad se pueden mandar aunque no esten en linea
     public boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException{
 
-        //PRIMERO: Hacer un query a la base de datos para
+        //PRIMERO: Hacer un query a la base de datos para comprobar si hay clientes con el mismo nombre registrados.
+
+        //SEGUNDO: Si no hay cliente con el mismo nombre, hacer transacción SQL para añadir usuario y contraseña (cifrada).
+
+        //Ante posibles fallos, devolver null
+        //finalmente llamar a conectarCliente()
 
 
 
