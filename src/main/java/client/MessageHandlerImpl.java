@@ -1,40 +1,36 @@
 package client;
 
+import javax.swing.*;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.List;
 
 public class MessageHandlerImpl extends UnicastRemoteObject implements MessageHandlerInterface {
 
-    // Constructor
-    public MessageHandlerImpl() throws RemoteException {
+    private final ChatClientApp chatApp;
+
+    public MessageHandlerImpl(ChatClientApp chatApp) throws RemoteException {
         super();
+        this.chatApp = chatApp;
     }
 
     @Override
     public void recibirMensaje(String mensaje, String usuarioEnvia) throws RemoteException {
-        System.out.println("\nTe ha llegado un nuevo mensaje de " + usuarioEnvia + ":\n");
-        System.out.println(mensaje);
+        SwingUtilities.invokeLater(() -> chatApp.addMessage(usuarioEnvia + ": " + mensaje));
     }
 
     @Override
     public void serNotificadoUsuariosConectados(List<String> listaUsuariosConectados) throws RemoteException {
-        System.out.println("Usuarios online actualmente:");
-        for (String usuario : listaUsuariosConectados) {
-            System.out.println("- " + usuario);
-        }
-        if (listaUsuariosConectados.isEmpty()) {
-            System.out.println("No hay usuarios conectados en este momento.");
-        }
+        SwingUtilities.invokeLater(() -> chatApp.updateOnlineUsers(listaUsuariosConectados.toArray(new String[0])));
     }
 
     @Override
     public void serNotificadoNuevoUsuario(String nombreCliente) throws RemoteException {
-        System.out.println("Nuevo usuario online: " + nombreCliente);
+        SwingUtilities.invokeLater(() -> chatApp.addMessage("Nuevo usuario conectado: " + nombreCliente));
     }
 
     @Override
     public void serNotificadoNuevoAmigo(String nombreAmigo) throws RemoteException {
-        System.out.println("¡Tienes un nuevo amigo! " + nombreAmigo + " ahora es tu amigo.");
+        SwingUtilities.invokeLater(() -> chatApp.addMessage("¡Tienes un nuevo amigo! " + nombreAmigo + " ahora es tu amigo."));
     }
 }
