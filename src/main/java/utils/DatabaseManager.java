@@ -179,6 +179,20 @@ public class DatabaseManager {
         return false;
     }
 
+    public boolean validarUsuario(String username, String password) {
+        String sql = "SELECT 1 FROM users WHERE username = ? AND password = ?";
+        try (Connection conn = connect(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            pstmt.setString(2, password);
+            ResultSet rs = pstmt.executeQuery();
+            return rs.next();
+        } catch (SQLException e) {
+            System.err.println("Error validando usuario: " + e.getMessage());
+            return false;
+        }
+    }
+
+
     public static void main(String[] args) {
         DatabaseManager dbManager = new DatabaseManager();
         dbManager.addUser("testUser", "testPassword");

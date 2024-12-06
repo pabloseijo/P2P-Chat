@@ -19,9 +19,6 @@ public interface ServerInterface extends Remote {
 
     // Métodos avanzados (con interacción con base de datos)
 
-    // Registrar un usuario en la base de datos si no existe y conectarlo.
-    boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException;
-
     // Solicitar amistad entre dos usuarios.
     boolean solicitarAmistad(String usuarioSolicitante, String usuarioReceptor) throws RemoteException;
 
@@ -33,4 +30,10 @@ public interface ServerInterface extends Remote {
 
     // Obtener solicitudes pendientes de amistad.
     List<String> obtenerSolicitudesPendientes(String nombreCliente) throws RemoteException;
+
+    boolean validarUsuario(String nombreCliente, String clave) throws RemoteException;
+
+    boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException;
+
+    boolean usuarioExiste(String username) throws RemoteException;
 }

@@ -1,7 +1,10 @@
 package client;
 
+import server.ServerInterface;
+
 import javax.swing.*;
 import java.awt.*;
+import java.rmi.RemoteException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -20,7 +23,7 @@ public class ChatClientApp extends JFrame {
         // Configuración de la ventana principal
         setTitle("Chat RMI");
         setSize(600, 400);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE); // Prevenir cierre automático
         setLayout(new BorderLayout());
 
         // Crear el menú
@@ -53,6 +56,25 @@ public class ChatClientApp extends JFrame {
                 showError("Selecciona un usuario y escribe un mensaje.");
             }
         });
+
+        // Manejo del cierre de la ventana
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                int confirm = JOptionPane.showConfirmDialog(
+                        ChatClientApp.this,
+                        "¿Estás seguro de que deseas desconectarte y salir?",
+                        "Confirmar Desconexión",
+                        JOptionPane.YES_NO_OPTION
+                );
+                if (confirm == JOptionPane.YES_OPTION) {
+                    Client.desconectarCliente(ChatClientApp.this);
+                    dispose(); // Cerrar la ventana
+                    System.exit(0); // Finalizar la aplicación
+                }
+            }
+        });
+
         inputPanel.add(messageField, BorderLayout.CENTER);
         inputPanel.add(sendButton, BorderLayout.EAST);
         add(inputPanel, BorderLayout.SOUTH);
@@ -71,45 +93,41 @@ public class ChatClientApp extends JFrame {
         // Menú Archivo
         JMenu fileMenu = new JMenu("Archivo");
         JMenuItem exitItem = new JMenuItem("Salir");
-        exitItem.addActionListener(e -> System.exit(0));
+        exitItem.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(
+                    this,
+                    "¿Estás seguro de que deseas desconectarte y salir?",
+                    "Confirmar Salida",
+                    JOptionPane.YES_NO_OPTION
+            );
+            if (confirm == JOptionPane.YES_OPTION) {
+                Client.desconectarCliente(this);
+                dispose();
+                System.exit(0);
+            }
+        });
         fileMenu.add(exitItem);
 
         // Menú Chat
         JMenu chatMenu = new JMenu("Chat");
-        JMenuItem newChatItem = new JMenuItem("Nuevo Chat");
-        newChatItem.addActionListener(e -> openNewChatWindow());
-        chatMenu.add(newChatItem);
+        JMenuItem disconnectItem = new JMenuItem("Desconectar");
+        disconnectItem.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(
+                    this,
+                    "¿Estás seguro de que deseas desconectarte?",
+                    "Confirmar Desconexión",
+                    JOptionPane.YES_NO_OPTION
+            );
+            if (confirm == JOptionPane.YES_OPTION) {
+                Client.desconectarCliente(this);
+            }
+        });
+        chatMenu.add(disconnectItem);
 
-        // Agregar menús al menú principal
         menuBar.add(fileMenu);
         menuBar.add(chatMenu);
 
         setJMenuBar(menuBar);
-    }
-
-    private void openNewChatWindow() {
-        JTextField recipientField = new JTextField();
-
-        Object[] message = {
-                "Usuario para chatear:", recipientField
-        };
-
-        int option = JOptionPane.showConfirmDialog(
-                this,
-                message,
-                "Nuevo Chat",
-                JOptionPane.OK_CANCEL_OPTION
-        );
-
-        if (option == JOptionPane.OK_OPTION) {
-            String recipient = recipientField.getText().trim();
-            if (!recipient.isEmpty()) {
-                addMessage("Iniciando chat con " + recipient + "...");
-                // Aquí puedes agregar lógica adicional para gestionar múltiples ventanas de chat
-            } else {
-                showError("El nombre del usuario no puede estar vacío.");
-            }
-        }
     }
 
     public void showConnectDialog() {
@@ -182,5 +200,59 @@ public class ChatClientApp extends JFrame {
 
     public String getUsername() {
         return username;
+    }
+
+    public boolean showLoginDialog(ServerInterface server) {
+        JTextField usernameField = new JTextField();
+        JPasswordField passwordField = new JPasswordField();
+        Object[] message = {
+                "Usuario:", usernameField,
+                "Contraseña:", passwordField
+        };
+
+        while (true) {
+            int option = JOptionPane.showConfirmDialog(
+                    this,
+                    message,
+                    "Inicio de Sesión",
+                    JOptionPane.OK_CANCEL_OPTION
+            );
+
+            if (option == JOptionPane.CANCEL_OPTION) {
+                System.exit(0); // Salir si se cancela
+            }
+
+            String username = usernameField.getText().trim();
+            String password = new String(passwordField.getPassword());
+
+            if (!username.isEmpty() && !password.isEmpty()) {
+                try {
+                    boolean loggedIn = server.validarUsuario(username, password);
+                    if (loggedIn) {
+                        setUsername(username);
+                        return true; // Iniciar sesión con éxito
+                    } else {
+                        int registerOption = JOptionPane.showConfirmDialog(
+                                this,
+                                "Usuario no encontrado. ¿Quieres registrarte?",
+                                "Registro",
+                                JOptionPane.YES_NO_OPTION
+                        );
+                        if (registerOption == JOptionPane.YES_OPTION) {
+                            boolean registered = server.registrarUsuario(username, password, null);
+                            if (registered) {
+                                JOptionPane.showMessageDialog(this, "Usuario registrado con éxito. Inicia sesión.");
+                            } else {
+                                JOptionPane.showMessageDialog(this, "Error al registrar usuario.");
+                            }
+                        }
+                    }
+                } catch (RemoteException e) {
+                    showError("Error de conexión con el servidor: " + e.getMessage());
+                }
+            } else {
+                showError("Usuario y contraseña son obligatorios.");
+            }
+        }
     }
 }

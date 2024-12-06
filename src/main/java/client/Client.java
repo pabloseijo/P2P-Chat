@@ -18,32 +18,30 @@ public class Client {
             // Crear instancia de la GUI principal
             ChatClientApp chatApp = new ChatClientApp();
 
-            // Mostrar la ventana inicial para solicitar nombre de usuario
-            String username = askForUsername(chatApp);
-            if (username == null || username.isEmpty()) {
-                System.exit(0); // Salir si el usuario cancela
-            }
-
-            chatApp.setUsername(username);
-
             // Configurar la conexión al servidor
             chatApp.setOnConnect(params -> {
                 String ip = params[0];
                 int port = Integer.parseInt(params[1]);
 
                 try {
+                    // Conexión al registro RMI
                     Registry registry = LocateRegistry.getRegistry(ip, port);
                     server = (ServerInterface) registry.lookup("server");
+
+                    // Mostrar el diálogo de inicio de sesión o registro
+                    if (!chatApp.showLoginDialog(server)) {
+                        System.exit(0); // Salir si no se logra iniciar sesión
+                    }
 
                     // Crear y exportar el objeto MessageHandler
                     int rmiPort = 1099; // Cambia esto si el puerto es dinámico
                     messageHandler = exportarMessageHandler(rmiPort, chatApp);
 
                     // Conectar al servidor
-                    boolean connected = server.conectarCliente(username, messageHandler);
+                    boolean connected = server.conectarCliente(chatApp.getUsername(), messageHandler);
                     if (connected) {
                         chatApp.addMessage("Conectado exitosamente al servidor.");
-                        nombreUsuario = username;
+                        nombreUsuario = chatApp.getUsername();
                     } else {
                         chatApp.addMessage("Error: No se pudo conectar al servidor.");
                     }
@@ -62,26 +60,72 @@ public class Client {
                 }
             });
 
-            // Mostrar el diálogo de conexión y la GUI principal
-            chatApp.setVisible(true);
+            // Mostrar el diálogo de conexión
             chatApp.showConnectDialog();
+
+            // Hacer visible la GUI
+            chatApp.setVisible(true);
         });
     }
 
-    private static String askForUsername(JFrame parent) {
-        JTextField usernameField = new JTextField();
-        Object[] message = {"Introduce tu nombre de usuario:", usernameField};
-        int option = JOptionPane.showConfirmDialog(
-                parent,
-                message,
-                "Nombre de Usuario",
-                JOptionPane.OK_CANCEL_OPTION
-        );
-        if (option == JOptionPane.OK_OPTION) {
-            return usernameField.getText().trim();
+
+    private static String askForUsername(ChatClientApp chatApp) {
+        while (true) {
+            JTextField usernameField = new JTextField();
+            JPasswordField passwordField = new JPasswordField();
+
+            Object[] message = {
+                    "Usuario:", usernameField,
+                    "Contraseña:", passwordField
+            };
+
+            int option = JOptionPane.showOptionDialog(
+                    chatApp,
+                    message,
+                    "Iniciar Sesión o Registrar",
+                    JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    new String[]{"Iniciar Sesión", "Registrar", "Cancelar"},
+                    "Iniciar Sesión"
+            );
+
+            if (option == JOptionPane.CANCEL_OPTION || option == -1) {
+                System.exit(0); // Salir si el usuario cancela
+            }
+
+            String username = usernameField.getText().trim();
+            String password = new String(passwordField.getPassword());
+
+            if (username.isEmpty() || password.isEmpty()) {
+                chatApp.showError("Usuario y contraseña son obligatorios.");
+                continue;
+            }
+
+            try {
+                if (option == 0) { // Iniciar Sesión
+                    if (server.validarUsuario(username, password)) {
+                        return username; // Usuario autenticado
+                    } else {
+                        chatApp.showError("Usuario o contraseña incorrectos.");
+                    }
+                } else if (option == 1) { // Registrar
+                    if (!server.usuarioExiste(username)) {
+                        if (server.registrarUsuario(username, password, null)) {
+                            JOptionPane.showMessageDialog(chatApp, "Usuario registrado con éxito. Inicia sesión.");
+                        } else {
+                            chatApp.showError("Error al registrar el usuario.");
+                        }
+                    } else {
+                        chatApp.showError("El usuario ya existe.");
+                    }
+                }
+            } catch (RemoteException e) {
+                chatApp.showError("Error de conexión con el servidor: " + e.getMessage());
+            }
         }
-        return null;
     }
+
 
     private static MessageHandlerInterface exportarMessageHandler(int puerto, ChatClientApp chatApp) {
         try {
@@ -123,4 +167,22 @@ public class Client {
             e.printStackTrace();
         }
     }
+
+    public static void desconectarCliente(ChatClientApp chatApp) {
+        try {
+            if (server != null && nombreUsuario != null && messageHandler != null) {
+                boolean success = server.desconectarCliente(nombreUsuario, messageHandler);
+                if (success) {
+                    chatApp.addMessage("Te has desconectado del servidor.");
+                    System.out.println("Cliente desconectado correctamente.");
+                } else {
+                    chatApp.addMessage("No se pudo desconectar correctamente.");
+                }
+            }
+        } catch (RemoteException e) {
+            chatApp.addMessage("Error al intentar desconectar: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
 }

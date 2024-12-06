@@ -52,10 +52,6 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
         }
     }
 
-    @Override
-    public boolean desconectarCliente(String nombreCliente, MessageHandlerInterface cliente) throws RemoteException{
-        return usuariosConectados.remove(cliente) != null;
-    }
 
     @Override
     public List<String> obtenerClientesConectadosList() throws RemoteException{
@@ -76,18 +72,19 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
 
 
 
-    //métodos avanzados (por ahora no tocar)
-    //vamos a necesitar conexión con una BBDD para el registro y gestión de amigos. Y para clave.
-    //las solicitudes de amistad se pueden mandar aunque no esten en linea
+    @Override
+    public boolean validarUsuario(String nombreCliente, String clave) throws RemoteException {
+        return dbManager.validarUsuario(nombreCliente, clave);
+    }
+
     @Override
     public boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException {
         if (!dbManager.usuarioExiste(nombreCliente)) {
             dbManager.addUser(nombreCliente, clave);
             return true;
         }
-        return false; // Usuario ya existente
+        return false;
     }
-
 
     @Override
     public boolean solicitarAmistad(String usuarioSolicitante, String usuarioReceptor) throws RemoteException {
@@ -111,6 +108,29 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean desconectarCliente(String nombreCliente, MessageHandlerInterface cliente) throws RemoteException {
+        synchronized (usuariosConectados) {
+            if (usuariosConectados.containsKey(cliente)) {
+                usuariosConectados.remove(cliente);
+
+                // Notificar a los demás usuarios que este cliente se ha desconectado
+                for (MessageHandlerInterface usuario : usuariosConectados.keySet()) {
+                    usuario.serNotificadoNuevoUsuario(nombreCliente + " se ha desconectado.");
+                }
+                System.out.println("Cliente desconectado: " + nombreCliente);
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    @Override
+    public boolean usuarioExiste(String username) throws RemoteException {
+        return dbManager.usuarioExiste(username);
     }
 
     @Override
