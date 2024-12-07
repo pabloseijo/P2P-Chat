@@ -207,13 +207,20 @@ public class ChatClientApp extends JFrame {
     private void sendMessage() {
         String recipient = onlineUsers.getSelectedValue();
         String message = messageField.getText().trim();
+
         if (recipient != null && !message.isEmpty()) {
+            // Verificar si el destinatario es un amigo
+            if (!friendsListModel.contains(recipient)) {
+                showError("Solo puedes enviar mensajes a tus amigos.");
+                return;
+            }
             onSendMessageCallback.accept(recipient, message);
             messageField.setText("");
         } else {
             showError("Selecciona un usuario y escribe un mensaje.");
         }
     }
+
 
     private void sendFriendRequest() {
         String friendUsername = JOptionPane.showInputDialog(this, "Introduce el nombre del usuario:");
