@@ -28,13 +28,15 @@ public class Client {
                     Registry registry = LocateRegistry.getRegistry(ip, port);
                     server = (ServerInterface) registry.lookup("server");
 
+                    boolean loggedIn = false;
+
                     // Mostrar el diálogo de inicio de sesión o registro
-                    if (!chatApp.showLoginDialog(server)) {
-                        System.exit(0); // Salir si no se logra iniciar sesión
+                    while (!loggedIn) {
+                        loggedIn = chatApp.showLoginDialog(server); // Maneja login y registro
                     }
 
                     // Crear y exportar el objeto MessageHandler
-                    int rmiPort = 1099; // Cambia esto si el puerto es dinámico
+                    int rmiPort = 1099;
                     messageHandler = exportarMessageHandler(rmiPort, chatApp);
 
                     // Conectar al servidor
@@ -42,12 +44,15 @@ public class Client {
                     if (connected) {
                         chatApp.addMessage("Conectado exitosamente al servidor.");
                         nombreUsuario = chatApp.getUsername();
+                        cargarDatosIniciales(chatApp); // Actualiza amigos y solicitudes
                     } else {
-                        chatApp.addMessage("Error: No se pudo conectar al servidor.");
+                        chatApp.showError("Error: No se pudo conectar al servidor.");
+                        System.exit(0);
                     }
                 } catch (Exception e) {
-                    chatApp.addMessage("Error al conectar al servidor: " + e.getMessage());
+                    chatApp.showError("Error al conectar al servidor: " + e.getMessage());
                     e.printStackTrace();
+                    System.exit(0);
                 }
             });
 
@@ -60,6 +65,23 @@ public class Client {
                 }
             });
 
+            // Manejo del cierre de la aplicación
+            chatApp.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosing(java.awt.event.WindowEvent e) {
+                    int confirm = JOptionPane.showConfirmDialog(
+                            chatApp,
+                            "¿Estás seguro de que deseas desconectarte y salir?",
+                            "Confirmar Cierre",
+                            JOptionPane.YES_NO_OPTION
+                    );
+                    if (confirm == JOptionPane.YES_OPTION) {
+                        desconectarCliente(chatApp);
+                        System.exit(0);
+                    }
+                }
+            });
+
             // Mostrar el diálogo de conexión
             chatApp.showConnectDialog();
 
@@ -69,69 +91,18 @@ public class Client {
     }
 
 
-    private static String askForUsername(ChatClientApp chatApp) {
-        while (true) {
-            JTextField usernameField = new JTextField();
-            JPasswordField passwordField = new JPasswordField();
-
-            Object[] message = {
-                    "Usuario:", usernameField,
-                    "Contraseña:", passwordField
-            };
-
-            int option = JOptionPane.showOptionDialog(
-                    chatApp,
-                    message,
-                    "Iniciar Sesión o Registrar",
-                    JOptionPane.OK_CANCEL_OPTION,
-                    JOptionPane.QUESTION_MESSAGE,
-                    null,
-                    new String[]{"Iniciar Sesión", "Registrar", "Cancelar"},
-                    "Iniciar Sesión"
-            );
-
-            if (option == JOptionPane.CANCEL_OPTION || option == -1) {
-                System.exit(0); // Salir si el usuario cancela
-            }
-
-            String username = usernameField.getText().trim();
-            String password = new String(passwordField.getPassword());
-
-            if (username.isEmpty() || password.isEmpty()) {
-                chatApp.showError("Usuario y contraseña son obligatorios.");
-                continue;
-            }
-
-            try {
-                if (option == 0) { // Iniciar Sesión
-                    if (server.validarUsuario(username, password)) {
-                        return username; // Usuario autenticado
-                    } else {
-                        chatApp.showError("Usuario o contraseña incorrectos.");
-                    }
-                } else if (option == 1) { // Registrar
-                    if (!server.usuarioExiste(username)) {
-                        if (server.registrarUsuario(username, password, null)) {
-                            JOptionPane.showMessageDialog(chatApp, "Usuario registrado con éxito. Inicia sesión.");
-                        } else {
-                            chatApp.showError("Error al registrar el usuario.");
-                        }
-                    } else {
-                        chatApp.showError("El usuario ya existe.");
-                    }
-                }
-            } catch (RemoteException e) {
-                chatApp.showError("Error de conexión con el servidor: " + e.getMessage());
-            }
+    private static void cargarDatosIniciales(ChatClientApp chatApp) {
+        try {
+            chatApp.actualizarAmigos();
+        } catch (Exception e) {
+            chatApp.showError("Error al cargar datos iniciales: " + e.getMessage());
         }
     }
-
 
     private static MessageHandlerInterface exportarMessageHandler(int puerto, ChatClientApp chatApp) {
         try {
             MessageHandlerInterface messageHandler = new MessageHandlerImpl(chatApp);
 
-            // Crear o localizar el registro RMI
             Registry registry;
             try {
                 registry = LocateRegistry.createRegistry(puerto);
@@ -139,7 +110,6 @@ public class Client {
                 registry = LocateRegistry.getRegistry(puerto);
             }
 
-            // Registrar el objeto en el registro RMI
             registry.rebind("messageHandler", messageHandler);
             System.out.println("Objeto RMI MessageHandler exportado correctamente en el puerto: " + puerto);
 
@@ -161,7 +131,7 @@ public class Client {
             }
 
             clienteRecibe.recibirMensaje(message, chatApp.getUsername());
-            chatApp.addMessage("Mensaje enviado a " + recipient + ": " + message);
+            chatApp.addMessage(chatApp.getUsername() + ": " + message);
         } catch (RemoteException e) {
             chatApp.addMessage("Error al enviar el mensaje: " + e.getMessage());
             e.printStackTrace();
@@ -185,4 +155,7 @@ public class Client {
         }
     }
 
+    public static ServerInterface getServer() {
+        return server;
+    }
 }

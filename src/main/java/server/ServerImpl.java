@@ -127,6 +127,24 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
         return false;
     }
 
+    @Override
+    public boolean rechazarSolicitudAmistad(String usuarioSolicitante, String usuarioReceptor) throws RemoteException {
+        if (dbManager.rechazarSolicitudAmistad(usuarioSolicitante, usuarioReceptor)) {
+            System.out.println("Solicitud de amistad rechazada entre " + usuarioSolicitante + " y " + usuarioReceptor);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public Map<String, List<String>> obtenerAmigosYSolicitudes(String nombreCliente) throws RemoteException {
+        Map<String, List<String>> datos = new HashMap<>();
+        datos.put("amigos", dbManager.obtenerAmigos(nombreCliente));
+        datos.put("solicitudes", dbManager.obtenerSolicitudesPendientes(nombreCliente));
+        return datos;
+    }
+
+
 
     @Override
     public boolean usuarioExiste(String username) throws RemoteException {

@@ -5,6 +5,7 @@ import server.ServerInterface;
 import javax.swing.*;
 import java.awt.*;
 import java.rmi.RemoteException;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -16,118 +17,100 @@ public class ChatClientApp extends JFrame {
     private JTextArea chatArea; // Área para mostrar mensajes
     private JTextField messageField; // Campo para escribir mensajes
     private JList<String> onlineUsers; // Lista de usuarios conectados
-    private DefaultListModel<String> onlineUsersModel; // Modelo para gestionar la lista de usuarios
-    private String username; // Atributo para almacenar el nombre de usuario
+    private DefaultListModel<String> onlineUsersModel; // Modelo para usuarios conectados
+    private JList<String> friendsList; // Lista de amigos
+    private DefaultListModel<String> friendsListModel; // Modelo para amigos
+    private JList<String> pendingRequestsList; // Lista de solicitudes de amistad pendientes
+    private DefaultListModel<String> pendingRequestsModel; // Modelo para solicitudes pendientes
+    private String username; // Nombre del usuario actual
 
     public ChatClientApp() {
         // Configuración de la ventana principal
         setTitle("Chat RMI");
-        setSize(600, 400);
-        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE); // Prevenir cierre automático
+        setSize(800, 500);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // Crear el menú
         setupMenu();
+        setupMainLayout();
+        setupCloseListener();
+    }
 
-        // Área de chat
+    private void setupMainLayout() {
+        // Panel central: área de chat
         chatArea = new JTextArea();
         chatArea.setEditable(false);
-        chatArea.setLineWrap(true);
-        chatArea.setWrapStyleWord(true);
         JScrollPane chatScrollPane = new JScrollPane(chatArea);
         add(chatScrollPane, BorderLayout.CENTER);
 
-        // Campo de mensaje y botón de enviar
-        JPanel inputPanel = new JPanel();
-        inputPanel.setLayout(new BorderLayout());
+        // Panel inferior: campo de mensaje
+        JPanel inputPanel = new JPanel(new BorderLayout());
         messageField = new JTextField();
         JButton sendButton = new JButton("Enviar");
-        sendButton.addActionListener(e -> {
-            String recipient = onlineUsers.getSelectedValue();
-            String message = messageField.getText().trim();
-            if (recipient != null && !message.isEmpty()) {
-                if (onSendMessageCallback != null) {
-                    onSendMessageCallback.accept(recipient, message);
-                    messageField.setText(""); // Limpiar el campo de mensaje
-                } else {
-                    showError("El envío de mensajes no está configurado.");
-                }
-            } else {
-                showError("Selecciona un usuario y escribe un mensaje.");
-            }
-        });
-
-        // Manejo del cierre de la ventana
-        addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override
-            public void windowClosing(java.awt.event.WindowEvent e) {
-                int confirm = JOptionPane.showConfirmDialog(
-                        ChatClientApp.this,
-                        "¿Estás seguro de que deseas desconectarte y salir?",
-                        "Confirmar Desconexión",
-                        JOptionPane.YES_NO_OPTION
-                );
-                if (confirm == JOptionPane.YES_OPTION) {
-                    Client.desconectarCliente(ChatClientApp.this);
-                    dispose(); // Cerrar la ventana
-                    System.exit(0); // Finalizar la aplicación
-                }
-            }
-        });
-
+        sendButton.addActionListener(e -> sendMessage());
         inputPanel.add(messageField, BorderLayout.CENTER);
         inputPanel.add(sendButton, BorderLayout.EAST);
         add(inputPanel, BorderLayout.SOUTH);
 
-        // Lista de usuarios conectados
+        // Panel derecho: listas de usuarios y amigos
+        JPanel rightPanel = new JPanel(new GridLayout(3, 1));
+
+        // Usuarios conectados
         onlineUsersModel = new DefaultListModel<>();
         onlineUsers = new JList<>(onlineUsersModel);
-        JScrollPane usersScrollPane = new JScrollPane(onlineUsers);
-        usersScrollPane.setPreferredSize(new Dimension(150, 0));
-        add(usersScrollPane, BorderLayout.EAST);
+        JScrollPane onlineUsersScroll = new JScrollPane(onlineUsers);
+        onlineUsersScroll.setBorder(BorderFactory.createTitledBorder("Usuarios Conectados"));
+        rightPanel.add(onlineUsersScroll);
+
+        // Lista de amigos
+        friendsListModel = new DefaultListModel<>();
+        friendsList = new JList<>(friendsListModel);
+        friendsList.addListSelectionListener(e -> openChatWithFriend());
+        JScrollPane friendsScroll = new JScrollPane(friendsList);
+        friendsScroll.setBorder(BorderFactory.createTitledBorder("Amigos"));
+        rightPanel.add(friendsScroll);
+
+        // Solicitudes de amistad pendientes
+        pendingRequestsModel = new DefaultListModel<>();
+        pendingRequestsList = new JList<>(pendingRequestsModel);
+        JScrollPane pendingRequestsScroll = new JScrollPane(pendingRequestsList);
+        pendingRequestsScroll.setBorder(BorderFactory.createTitledBorder("Solicitudes Pendientes"));
+        rightPanel.add(pendingRequestsScroll);
+
+        // Agregar el panel derecho a la ventana principal
+        add(rightPanel, BorderLayout.EAST);
     }
+
 
     private void setupMenu() {
         JMenuBar menuBar = new JMenuBar();
 
-        // Menú Archivo
         JMenu fileMenu = new JMenu("Archivo");
         JMenuItem exitItem = new JMenuItem("Salir");
-        exitItem.addActionListener(e -> {
-            int confirm = JOptionPane.showConfirmDialog(
-                    this,
-                    "¿Estás seguro de que deseas desconectarte y salir?",
-                    "Confirmar Salida",
-                    JOptionPane.YES_NO_OPTION
-            );
-            if (confirm == JOptionPane.YES_OPTION) {
-                Client.desconectarCliente(this);
-                dispose();
-                System.exit(0);
-            }
-        });
+        exitItem.addActionListener(e -> confirmAndExit());
         fileMenu.add(exitItem);
 
-        // Menú Chat
-        JMenu chatMenu = new JMenu("Chat");
-        JMenuItem disconnectItem = new JMenuItem("Desconectar");
-        disconnectItem.addActionListener(e -> {
-            int confirm = JOptionPane.showConfirmDialog(
-                    this,
-                    "¿Estás seguro de que deseas desconectarte?",
-                    "Confirmar Desconexión",
-                    JOptionPane.YES_NO_OPTION
-            );
-            if (confirm == JOptionPane.YES_OPTION) {
-                Client.desconectarCliente(this);
-            }
-        });
-        chatMenu.add(disconnectItem);
+        JMenu friendsMenu = new JMenu("Amigos");
+        JMenuItem sendRequestItem = new JMenuItem("Enviar Solicitud de Amistad");
+        sendRequestItem.addActionListener(e -> sendFriendRequest());
+        friendsMenu.add(sendRequestItem);
+
+        JMenuItem manageRequestsItem = new JMenuItem("Gestionar Solicitudes");
+        manageRequestsItem.addActionListener(e -> manageFriendRequests());
+        friendsMenu.add(manageRequestsItem);
 
         menuBar.add(fileMenu);
-        menuBar.add(chatMenu);
-
+        menuBar.add(friendsMenu);
         setJMenuBar(menuBar);
+    }
+
+    private void setupCloseListener() {
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                confirmAndExit();
+            }
+        });
     }
 
     public void showConnectDialog() {
@@ -138,17 +121,9 @@ public class ChatClientApp extends JFrame {
         JTextField ipField = new JTextField("localhost");
         JTextField portField = new JTextField("1099");
 
-        Object[] message = {
-                "Dirección IP:", ipField,
-                "Puerto:", portField
-        };
+        Object[] message = {"Dirección IP:", ipField, "Puerto:", portField};
 
-        int option = JOptionPane.showConfirmDialog(
-                this,
-                message,
-                "Conexión al servidor",
-                JOptionPane.OK_CANCEL_OPTION
-        );
+        int option = JOptionPane.showConfirmDialog(this, message, "Conexión al servidor", JOptionPane.OK_CANCEL_OPTION);
 
         if (option == JOptionPane.OK_OPTION) {
             String ip = ipField.getText().trim();
@@ -159,14 +134,134 @@ public class ChatClientApp extends JFrame {
                     onConnectCallback.accept(new String[]{ip, String.valueOf(portNumber), username});
                 } catch (NumberFormatException e) {
                     showError("El puerto debe ser un número.");
-                    showConnectDialog(); // Reintentar si el puerto no es válido
+                    showConnectDialog();
                 }
             } else {
                 showError("Todos los campos son obligatorios.");
-                showConnectDialog(); // Reintentar si algún campo está vacío
+                showConnectDialog();
             }
         } else {
-            System.exit(0); // Cerrar la aplicación si se cancela
+            System.exit(0);
+        }
+    }
+
+    public boolean showLoginDialog(ServerInterface server) {
+        JTextField usernameField = new JTextField();
+        JPasswordField passwordField = new JPasswordField();
+        Object[] message = {"Usuario:", usernameField, "Contraseña:", passwordField};
+
+        while (true) {
+            int option = JOptionPane.showOptionDialog(
+                    this,
+                    message,
+                    "Inicio de Sesión",
+                    JOptionPane.YES_NO_CANCEL_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    new String[]{"Iniciar Sesión", "Registrar", "Cancelar"},
+                    "Iniciar Sesión"
+            );
+
+            if (option == 2 || option == JOptionPane.CLOSED_OPTION) { // Cancelar
+                System.exit(0);
+            } else if (option == 1) { // Registrar
+                showRegisterDialog(server);
+                continue;
+            }
+
+            String username = usernameField.getText().trim();
+            String password = new String(passwordField.getPassword());
+
+            if (!username.isEmpty() && !password.isEmpty()) {
+                try {
+                    if (server.validarUsuario(username, password)) {
+                        setUsername(username);
+                        return true; // Inicio de sesión exitoso
+                    } else {
+                        showError("Usuario o contraseña incorrectos.");
+                    }
+                } catch (RemoteException e) {
+                    showError("Error de conexión: " + e.getMessage());
+                }
+            } else {
+                showError("Usuario y contraseña son obligatorios.");
+            }
+        }
+    }
+
+
+    private void confirmAndExit() {
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "¿Estás seguro de que deseas desconectarte y salir?",
+                "Confirmar Desconexión",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (confirm == JOptionPane.YES_OPTION) {
+            Client.desconectarCliente(this);
+            dispose();
+            System.exit(0);
+        }
+    }
+
+    private void sendMessage() {
+        String recipient = onlineUsers.getSelectedValue();
+        String message = messageField.getText().trim();
+        if (recipient != null && !message.isEmpty()) {
+            onSendMessageCallback.accept(recipient, message);
+            messageField.setText("");
+        } else {
+            showError("Selecciona un usuario y escribe un mensaje.");
+        }
+    }
+
+    private void sendFriendRequest() {
+        String friendUsername = JOptionPane.showInputDialog(this, "Introduce el nombre del usuario:");
+        if (friendUsername != null && !friendUsername.trim().isEmpty()) {
+            try {
+                boolean success = Client.getServer().solicitarAmistad(username, friendUsername);
+                if (success) JOptionPane.showMessageDialog(this, "Solicitud enviada.");
+                else showError("Error: El usuario no existe o ya hay una solicitud pendiente.");
+            } catch (RemoteException e) {
+                showError("Error al enviar solicitud: " + e.getMessage());
+            }
+        }
+    }
+
+    private void manageFriendRequests() {
+        try {
+            List<String> requests = Client.getServer().obtenerSolicitudesPendientes(username);
+            pendingRequestsModel.clear();
+            pendingRequestsModel.addAll(requests);
+
+            String selectedRequest = (String) JOptionPane.showInputDialog(
+                    this, "Selecciona una solicitud para aceptar:", "Solicitudes Pendientes",
+                    JOptionPane.PLAIN_MESSAGE, null, requests.toArray(), null);
+
+            if (selectedRequest != null) {
+                Client.getServer().aceptarAmistad(selectedRequest, username);
+                JOptionPane.showMessageDialog(this, "Solicitud aceptada. " + selectedRequest + " es tu amigo.");
+                actualizarAmigos();
+            }
+        } catch (RemoteException e) {
+            showError("Error al gestionar solicitudes: " + e.getMessage());
+        }
+    }
+
+    public void actualizarAmigos() {
+        try {
+            List<String> friends = Client.getServer().obtenerListaAmigos(username);
+            friendsListModel.clear();
+            friendsListModel.addAll(friends);
+        } catch (RemoteException e) {
+            showError("Error al actualizar amigos: " + e.getMessage());
+        }
+    }
+
+    private void openChatWithFriend() {
+        String selectedFriend = friendsList.getSelectedValue();
+        if (selectedFriend != null) {
+            addMessage("Iniciando chat con " + selectedFriend);
         }
     }
 
@@ -195,14 +290,14 @@ public class ChatClientApp extends JFrame {
 
     public void setUsername(String username) {
         this.username = username;
-        setTitle("Chat RMI - " + username); // Actualizar el título con el nombre del usuario
+        setTitle("Chat RMI - " + username);
     }
 
     public String getUsername() {
         return username;
     }
 
-    public boolean showLoginDialog(ServerInterface server) {
+    public void showRegisterDialog(ServerInterface server) {
         JTextField usernameField = new JTextField();
         JPasswordField passwordField = new JPasswordField();
         Object[] message = {
@@ -214,44 +309,32 @@ public class ChatClientApp extends JFrame {
             int option = JOptionPane.showConfirmDialog(
                     this,
                     message,
-                    "Inicio de Sesión",
+                    "Registrar Usuario",
                     JOptionPane.OK_CANCEL_OPTION
             );
 
-            if (option == JOptionPane.CANCEL_OPTION) {
-                System.exit(0); // Salir si se cancela
+            if (option == JOptionPane.CANCEL_OPTION || option == JOptionPane.CLOSED_OPTION) {
+                break; // Salir si el usuario cancela
             }
 
-            String username = usernameField.getText().trim();
-            String password = new String(passwordField.getPassword());
+            String newUsername = usernameField.getText().trim();
+            String newPassword = new String(passwordField.getPassword());
 
-            if (!username.isEmpty() && !password.isEmpty()) {
+            if (!newUsername.isEmpty() && !newPassword.isEmpty()) {
                 try {
-                    boolean loggedIn = server.validarUsuario(username, password);
-                    if (loggedIn) {
-                        setUsername(username);
-                        return true; // Iniciar sesión con éxito
+                    boolean registered = server.registrarUsuario(newUsername, newPassword, null);
+                    if (registered) {
+                        JOptionPane.showMessageDialog(this, "Registro exitoso. Inicia sesión.");
+                        break; // Salir después de un registro exitoso
                     } else {
-                        int registerOption = JOptionPane.showConfirmDialog(
-                                this,
-                                "Usuario no encontrado. ¿Quieres registrarte?",
-                                "Registro",
-                                JOptionPane.YES_NO_OPTION
-                        );
-                        if (registerOption == JOptionPane.YES_OPTION) {
-                            boolean registered = server.registrarUsuario(username, password, null);
-                            if (registered) {
-                                JOptionPane.showMessageDialog(this, "Usuario registrado con éxito. Inicia sesión.");
-                            } else {
-                                JOptionPane.showMessageDialog(this, "Error al registrar usuario.");
-                            }
-                        }
+                        showError("El nombre de usuario ya existe. Inténtalo de nuevo.");
                     }
                 } catch (RemoteException e) {
-                    showError("Error de conexión con el servidor: " + e.getMessage());
+                    showError("Error de conexión al servidor: " + e.getMessage());
+                    break;
                 }
             } else {
-                showError("Usuario y contraseña son obligatorios.");
+                showError("El nombre de usuario y la contraseña no pueden estar vacíos.");
             }
         }
     }

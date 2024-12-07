@@ -198,4 +198,21 @@ public class DatabaseManager {
         dbManager.addUser("testUser", "testPassword");
         System.out.println("Usuario testUser agregado.");
     }
+
+    // Rechazar una solicitud de amistad
+    public boolean rechazarSolicitudAmistad(String fromUser, String toUser) {
+        String sql = "DELETE FROM friend_requests " +
+                "WHERE from_user_id = (SELECT id FROM users WHERE username = ?) " +
+                "AND to_user_id = (SELECT id FROM users WHERE username = ?) " +
+                "AND status = 'PENDING'";
+        try (Connection conn = connect(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, fromUser);
+            pstmt.setString(2, toUser);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Error al rechazar solicitud de amistad: " + e.getMessage());
+            return false;
+        }
+    }
+
 }

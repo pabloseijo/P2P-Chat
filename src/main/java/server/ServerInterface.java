@@ -5,6 +5,7 @@ import client.MessageHandlerInterface;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
+import java.util.Map;
 
 public interface ServerInterface extends Remote {
 
@@ -24,6 +25,10 @@ public interface ServerInterface extends Remote {
 
     // Aceptar una solicitud de amistad pendiente.
     boolean aceptarAmistad(String usuarioSolicitante, String usuarioReceptor) throws RemoteException;
+
+    boolean rechazarSolicitudAmistad(String solicitante, String receptor) throws RemoteException;
+
+    Map<String, List<String>> obtenerAmigosYSolicitudes(String nombreCliente) throws RemoteException;
 
     // Obtener la lista de amigos de un cliente.
     List<String> obtenerListaAmigos(String nombreCliente) throws RemoteException;
