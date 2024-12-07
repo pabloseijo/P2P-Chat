@@ -21,16 +21,45 @@ public class MessageHandlerImpl extends UnicastRemoteObject implements MessageHa
 
     @Override
     public void serNotificadoUsuariosConectados(List<String> listaUsuariosConectados) throws RemoteException {
-        SwingUtilities.invokeLater(() -> chatApp.updateOnlineUsers(listaUsuariosConectados.toArray(new String[0])));
+        SwingUtilities.invokeLater(() -> {
+            chatApp.updateOnlineUsers(listaUsuariosConectados.toArray(new String[0]));
+            chatApp.addMessage("La lista de usuarios conectados ha sido actualizada.");
+        });
     }
 
     @Override
     public void serNotificadoNuevoUsuario(String nombreCliente) throws RemoteException {
-        SwingUtilities.invokeLater(() -> chatApp.addMessage("Nuevo usuario conectado: " + nombreCliente));
+        SwingUtilities.invokeLater(() -> {
+            chatApp.addMessage("Nuevo usuario conectado: " + nombreCliente);
+            actualizarListaUsuariosConectados();
+        });
     }
 
     @Override
     public void serNotificadoNuevoAmigo(String nombreAmigo) throws RemoteException {
-        SwingUtilities.invokeLater(() -> chatApp.addMessage("¡Tienes un nuevo amigo! " + nombreAmigo + " ahora es tu amigo."));
+        SwingUtilities.invokeLater(() -> {
+            chatApp.addMessage("¡Tienes un nuevo amigo! " + nombreAmigo + " ahora es tu amigo.");
+            actualizarListaAmigos();
+        });
+    }
+
+    // Método para actualizar la lista de usuarios conectados
+    private void actualizarListaUsuariosConectados() {
+        try {
+            List<String> usuariosConectados = Client.getServer().obtenerClientesConectadosList();
+            chatApp.updateOnlineUsers(usuariosConectados.toArray(new String[0]));
+        } catch (RemoteException e) {
+            chatApp.showError("Error al actualizar la lista de usuarios conectados: " + e.getMessage());
+        }
+    }
+
+    // Método para actualizar la lista de amigos
+    private void actualizarListaAmigos() {
+        try {
+            List<String> listaAmigos = Client.getServer().obtenerListaAmigos(chatApp.getUsername());
+            chatApp.updateFriendsList(listaAmigos.toArray(new String[0]));
+        } catch (RemoteException e) {
+            chatApp.showError("Error al actualizar la lista de amigos: " + e.getMessage());
+        }
     }
 }

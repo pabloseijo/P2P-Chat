@@ -297,6 +297,14 @@ public class ChatClientApp extends JFrame {
         return username;
     }
 
+    public void updateFriendsList(String[] friends) {
+        friendsListModel.clear();
+        for (String friend : friends) {
+            friendsListModel.addElement(friend);
+        }
+    }
+
+
     public void showRegisterDialog(ServerInterface server) {
         JTextField usernameField = new JTextField();
         JPasswordField passwordField = new JPasswordField();

@@ -28,29 +28,31 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
     }
 
     //Métodos remotos básicos:
-    @Override // Vamos a tener que comprobar posteriormente que no este duplicado el nombre.
-    public boolean conectarCliente(String nombreCliente, MessageHandlerInterface cliente) throws RemoteException{//posteriormente vamos a pedir clave
-        if (!usuariosConectados.containsKey(cliente)) {
+    @Override
+    public boolean conectarCliente(String nombreCliente, MessageHandlerInterface cliente) throws RemoteException {
+        synchronized (usuariosConectados) {
+            if (!usuariosConectados.containsKey(cliente)) {
+                // Notificar al cliente recién conectado sobre los usuarios ya conectados
+                List<String> listaUsuariosConectados = obtenerClientesConectadosList();
+                cliente.serNotificadoUsuariosConectados(listaUsuariosConectados);
 
-            //Metodo para notificar al cliente del resto de clientes conectados, es un método RMI del cliente:
-            List<String> listaUsuariosConectados = this.obtenerClientesConectadosList();
-            cliente.serNotificadoUsuariosConectados(listaUsuariosConectados);
+                // Notificar a todos los clientes ya conectados sobre el nuevo usuario
+                for (Map.Entry<MessageHandlerInterface, String> entry : usuariosConectados.entrySet()) {
+                    MessageHandlerInterface usuario = entry.getKey();
+                    usuario.serNotificadoNuevoUsuario(nombreCliente);
+                }
 
-            //TODO: Metodo para notificar al resto de clientes de que se conecto un cliente, es un metodo RMI del cliente:
-            for (MessageHandlerInterface usuario : usuariosConectados.keySet()){
-                usuario.serNotificadoNuevoUsuario(nombreCliente);
+                // Añadir el nuevo cliente al mapa de usuarios conectados
+                usuariosConectados.put(cliente, nombreCliente);
+
+                System.out.println("Cliente conectado: " + nombreCliente);
+                return true;
+            } else {
+                return false;
             }
-
-            // Añadimos al usuario nuevo al mapa de usuariosConectados:
-            usuariosConectados.put(cliente, nombreCliente);
-
-            //Indicamos al recolector de basura que no la vamos a utilizar más.
-            listaUsuariosConectados = null;
-            return true;
-        } else {
-            return false;
         }
     }
+
 
 
     @Override
