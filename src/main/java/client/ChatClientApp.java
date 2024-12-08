@@ -353,4 +353,12 @@ public class ChatClientApp extends JFrame {
             }
         }
     }
+
+    public void updatePendingRequests(String[] requests) {
+        pendingRequestsModel.clear();
+        for (String request : requests) {
+            pendingRequestsModel.addElement(request);
+        }
+    }
+
 }

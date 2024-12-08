@@ -17,4 +17,6 @@ public interface MessageHandlerInterface extends Remote {
 
     // Notificación de un nuevo amigo
     void serNotificadoNuevoAmigo(String nombreAmigo) throws RemoteException; // Nuevo método
+
+    void serNotificadoNuevaSolicitud(String usuarioSolicitante) throws RemoteException;
 }

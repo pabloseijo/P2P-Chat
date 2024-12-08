@@ -31,28 +31,27 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
     @Override
     public boolean conectarCliente(String nombreCliente, MessageHandlerInterface cliente) throws RemoteException {
         synchronized (usuariosConectados) {
-            if (!usuariosConectados.containsKey(cliente)) {
-                // Notificar al cliente recién conectado sobre los usuarios ya conectados
-                List<String> listaUsuariosConectados = obtenerClientesConectadosList();
-                cliente.serNotificadoUsuariosConectados(listaUsuariosConectados);
-
-                // Notificar a todos los clientes ya conectados sobre el nuevo usuario
-                for (Map.Entry<MessageHandlerInterface, String> entry : usuariosConectados.entrySet()) {
-                    MessageHandlerInterface usuario = entry.getKey();
-                    usuario.serNotificadoNuevoUsuario(nombreCliente);
-                }
-
-                // Añadir el nuevo cliente al mapa de usuarios conectados
+            if (!usuariosConectados.containsValue(nombreCliente)) {
+                // Añadir el nuevo cliente a la lista de conectados
                 usuariosConectados.put(cliente, nombreCliente);
 
-                System.out.println("Cliente conectado: " + nombreCliente);
-                return true;
-            } else {
-                return false;
+                // Obtener la lista completa de usuarios conectados
+                List<String> listaUsuariosConectados = new ArrayList<>(usuariosConectados.values());
+
+                // Notificar a todos los clientes conectados la lista completa
+                for (MessageHandlerInterface usuario : usuariosConectados.keySet()) {
+                    try {
+                        usuario.serNotificadoUsuariosConectados(listaUsuariosConectados);
+                    } catch (RemoteException e) {
+                        System.err.println("Error al notificar usuarios conectados: " + e.getMessage());
+                    }
+                }
+
+                return true; // Conexión exitosa
             }
+            return false; // Cliente ya está conectado
         }
     }
-
 
 
     @Override
@@ -90,13 +89,26 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
 
     @Override
     public boolean solicitarAmistad(String usuarioSolicitante, String usuarioReceptor) throws RemoteException {
-        // Verificar si ambos usuarios existen en la base de datos
-        if (dbManager.usuarioExiste(usuarioSolicitante) && dbManager.usuarioExiste(usuarioReceptor)) {
-            dbManager.addFriendRequest(usuarioSolicitante, usuarioReceptor);
-            return true;
+        synchronized (usuariosConectados) {
+            // Verificar si ambos usuarios existen en la base de datos
+            if (dbManager.usuarioExiste(usuarioSolicitante) && dbManager.usuarioExiste(usuarioReceptor)) {
+                // Agregar la solicitud de amistad en la base de datos
+                dbManager.addFriendRequest(usuarioSolicitante, usuarioReceptor);
+
+                // Notificar al usuario receptor si está conectado
+                for (Map.Entry<MessageHandlerInterface, String> entry : usuariosConectados.entrySet()) {
+                    if (entry.getValue().equals(usuarioReceptor)) {
+                        MessageHandlerInterface receptor = entry.getKey();
+                        receptor.serNotificadoNuevaSolicitud(usuarioSolicitante); // Método remoto
+                        return true; // Solicitud procesada correctamente
+                    }
+                }
+                return true; // Se agregó la solicitud, pero el receptor no está conectado
+            }
+            return false; // Usuarios no encontrados en la base de datos
         }
-        return false;
     }
+
 
     @Override
     public boolean aceptarAmistad(String usuarioSolicitante, String usuarioReceptor) throws RemoteException {

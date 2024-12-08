@@ -27,12 +27,36 @@ public class MessageHandlerImpl extends UnicastRemoteObject implements MessageHa
         });
     }
 
+
     @Override
     public void serNotificadoNuevoUsuario(String nombreCliente) throws RemoteException {
         SwingUtilities.invokeLater(() -> {
             chatApp.addMessage("Nuevo usuario conectado: " + nombreCliente);
-            actualizarListaUsuariosConectados();
+            // Solicitar la lista completa de usuarios conectados al servidor
+            try {
+                List<String> listaUsuariosActualizados = Client.getServer().obtenerClientesConectadosList();
+                chatApp.updateOnlineUsers(listaUsuariosActualizados.toArray(new String[0]));
+            } catch (RemoteException e) {
+                chatApp.showError("Error al actualizar la lista de usuarios conectados: " + e.getMessage());
+            }
         });
+    }
+
+    @Override
+    public void serNotificadoNuevaSolicitud(String usuarioSolicitante) throws RemoteException {
+        SwingUtilities.invokeLater(() -> {
+            chatApp.addMessage("Nueva solicitud de amistad de: " + usuarioSolicitante);
+            actualizarSolicitudesPendientes();
+        });
+    }
+
+    private void actualizarSolicitudesPendientes() {
+        try {
+            List<String> solicitudes = Client.getServer().obtenerSolicitudesPendientes(chatApp.getUsername());
+            chatApp.updatePendingRequests(solicitudes.toArray(new String[0]));
+        } catch (RemoteException e) {
+            chatApp.showError("Error al actualizar solicitudes pendientes: " + e.getMessage());
+        }
     }
 
     @Override
