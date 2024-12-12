@@ -215,4 +215,35 @@ public class DatabaseManager {
         }
     }
 
+    public String obtenerHashPassword(String nombreCliente) {
+        String query = "SELECT password FROM users WHERE username = ?"; // Asegúrate de que las columnas coincidan
+        try (Connection conn = connect();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, nombreCliente); // Parámetro del nombre de usuario
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("password"); // Devuelve el hash almacenado en la columna 'password'
+            }
+        } catch (SQLException e) {
+            System.err.println("Error obteniendo hash de la contraseña: " + e.getMessage());
+        }
+        return null; // Si no se encuentra el usuario o hay un error
+    }
+
+    public boolean existeSolicitudPendiente(String fromUser, String toUser) {
+        String sql = "SELECT 1 FROM friend_requests " +
+                "WHERE from_user_id = (SELECT id FROM users WHERE username = ?) " +
+                "AND to_user_id = (SELECT id FROM users WHERE username = ?) " +
+                "AND status = 'PENDING'";
+        try (Connection conn = connect(); PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, fromUser);
+            pstmt.setString(2, toUser);
+            ResultSet rs = pstmt.executeQuery();
+            return rs.next(); // Si devuelve true, ya existe una solicitud pendiente
+        } catch (SQLException e) {
+            System.err.println("Error comprobando solicitud pendiente: " + e.getMessage());
+            return false;
+        }
+    }
+
 }

@@ -1,6 +1,7 @@
 package server;
 
 import client.MessageHandlerInterface;
+import org.mindrot.jbcrypt.BCrypt;
 import utils.DatabaseManager;
 
 import java.rmi.RemoteException;
@@ -72,16 +73,25 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
     }
 
 
-
     @Override
     public boolean validarUsuario(String nombreCliente, String clave) throws RemoteException {
-        return dbManager.validarUsuario(nombreCliente, clave);
+        // Obtener el hash almacenado en la base de datos
+        String hashedPassword = dbManager.obtenerHashPassword(nombreCliente);
+        if (hashedPassword != null) {
+            // Verificar la contraseña en texto plano con el hash almacenado
+            return BCrypt.checkpw(clave, hashedPassword);
+        }
+        return false; // Usuario no existe o contraseña incorrecta
     }
+
 
     @Override
     public boolean registrarUsuario(String nombreCliente, String clave, MessageHandlerInterface cliente) throws RemoteException {
         if (!dbManager.usuarioExiste(nombreCliente)) {
-            dbManager.addUser(nombreCliente, clave);
+            // Generar hash de la contraseña
+            String hashedPassword = BCrypt.hashpw(clave, BCrypt.gensalt());
+            // Guardar en la base de datos el nombre de usuario y el hash
+            dbManager.addUser(nombreCliente, hashedPassword);
             return true;
         }
         return false;
@@ -92,6 +102,12 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
         synchronized (usuariosConectados) {
             // Verificar si ambos usuarios existen en la base de datos
             if (dbManager.usuarioExiste(usuarioSolicitante) && dbManager.usuarioExiste(usuarioReceptor)) {
+                // Verificar si ya existe una solicitud pendiente
+                if (dbManager.existeSolicitudPendiente(usuarioSolicitante, usuarioReceptor)) {
+                    System.out.println("Ya existe una solicitud pendiente de " + usuarioSolicitante + " a " + usuarioReceptor);
+                    return false; // Evitar solicitudes duplicadas
+                }
+
                 // Agregar la solicitud de amistad en la base de datos
                 dbManager.addFriendRequest(usuarioSolicitante, usuarioReceptor);
 
@@ -108,6 +124,7 @@ public class ServerImpl extends UnicastRemoteObject implements ServerInterface{
             return false; // Usuarios no encontrados en la base de datos
         }
     }
+
 
 
     @Override

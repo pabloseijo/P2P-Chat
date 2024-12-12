@@ -16,8 +16,14 @@ public class MessageHandlerImpl extends UnicastRemoteObject implements MessageHa
 
     @Override
     public void recibirMensaje(String mensaje, String usuarioEnvia) throws RemoteException {
-        SwingUtilities.invokeLater(() -> chatApp.addMessage(usuarioEnvia + ": " + mensaje));
+        SwingUtilities.invokeLater(() -> {
+            chatApp.agregarMensajeAConversacion(usuarioEnvia, usuarioEnvia + ": " + mensaje);
+            if (usuarioEnvia.equals(chatApp.getUsuarioSeleccionado())) {
+                chatApp.actualizarChatArea();
+            }
+        });
     }
+
 
     @Override
     public void serNotificadoUsuariosConectados(List<String> listaUsuariosConectados) throws RemoteException {

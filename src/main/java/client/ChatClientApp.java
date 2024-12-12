@@ -1,11 +1,16 @@
 package client;
 
+import org.mindrot.jbcrypt.BCrypt;
 import server.ServerInterface;
 
 import javax.swing.*;
 import java.awt.*;
 import java.rmi.RemoteException;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -23,6 +28,12 @@ public class ChatClientApp extends JFrame {
     private JList<String> pendingRequestsList; // Lista de solicitudes de amistad pendientes
     private DefaultListModel<String> pendingRequestsModel; // Modelo para solicitudes pendientes
     private String username; // Nombre del usuario actual
+    // Formateador de la hora
+    private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private final Map<String, List<String>> conversaciones = new HashMap<>();
+    private String usuarioSeleccionado = null; // Usuario actualmente seleccionado
+
+
 
     public ChatClientApp() {
         // Configuración de la ventana principal
@@ -58,6 +69,12 @@ public class ChatClientApp extends JFrame {
         // Usuarios conectados
         onlineUsersModel = new DefaultListModel<>();
         onlineUsers = new JList<>(onlineUsersModel);
+        onlineUsers.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                usuarioSeleccionado = onlineUsers.getSelectedValue();
+                actualizarChatArea(); // Actualiza la conversación del usuario seleccionado
+            }
+        });
         JScrollPane onlineUsersScroll = new JScrollPane(onlineUsers);
         onlineUsersScroll.setBorder(BorderFactory.createTitledBorder("Usuarios Conectados"));
         rightPanel.add(onlineUsersScroll);
@@ -65,7 +82,12 @@ public class ChatClientApp extends JFrame {
         // Lista de amigos
         friendsListModel = new DefaultListModel<>();
         friendsList = new JList<>(friendsListModel);
-        friendsList.addListSelectionListener(e -> openChatWithFriend());
+        friendsList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                usuarioSeleccionado = friendsList.getSelectedValue();
+                actualizarChatArea(); // Actualiza la conversación del usuario seleccionado
+            }
+        });
         JScrollPane friendsScroll = new JScrollPane(friendsList);
         friendsScroll.setBorder(BorderFactory.createTitledBorder("Amigos"));
         rightPanel.add(friendsScroll);
@@ -80,6 +102,7 @@ public class ChatClientApp extends JFrame {
         // Agregar el panel derecho a la ventana principal
         add(rightPanel, BorderLayout.EAST);
     }
+
 
 
     private void setupMenu() {
@@ -176,6 +199,11 @@ public class ChatClientApp extends JFrame {
                 try {
                     if (server.validarUsuario(username, password)) {
                         setUsername(username);
+
+                        // Actualizar las solicitudes pendientes al iniciar sesión
+                        List<String> solicitudes = server.obtenerSolicitudesPendientes(username);
+                        updatePendingRequests(solicitudes.toArray(new String[0]));
+
                         return true; // Inicio de sesión exitoso
                     } else {
                         showError("Usuario o contraseña incorrectos.");
@@ -209,31 +237,53 @@ public class ChatClientApp extends JFrame {
         String message = messageField.getText().trim();
 
         if (recipient != null && !message.isEmpty()) {
-            // Verificar si el destinatario es un amigo
-            if (!friendsListModel.contains(recipient)) {
-                showError("Solo puedes enviar mensajes a tus amigos.");
-                return;
-            }
             onSendMessageCallback.accept(recipient, message);
+            agregarMensajeAConversacion(recipient, "Tú: " + message);
+            actualizarChatArea();
             messageField.setText("");
         } else {
             showError("Selecciona un usuario y escribe un mensaje.");
         }
     }
 
+    public void agregarMensajeAConversacion(String usuario, String mensaje) {
+        conversaciones.putIfAbsent(usuario, new ArrayList<>());
+        conversaciones.get(usuario).add(mensaje);
+    }
+
+    public void actualizarChatArea() {
+        chatArea.setText(""); // Limpiar el área de chat
+        if (usuarioSeleccionado != null && conversaciones.containsKey(usuarioSeleccionado)) {
+            List<String> mensajes = conversaciones.get(usuarioSeleccionado);
+            for (String mensaje : mensajes) {
+                chatArea.append(mensaje + "\n");
+            }
+        }
+    }
+
+    public String getUsuarioSeleccionado() {
+        return usuarioSeleccionado;
+    }
 
     private void sendFriendRequest() {
         String friendUsername = JOptionPane.showInputDialog(this, "Introduce el nombre del usuario:");
         if (friendUsername != null && !friendUsername.trim().isEmpty()) {
             try {
                 boolean success = Client.getServer().solicitarAmistad(username, friendUsername);
-                if (success) JOptionPane.showMessageDialog(this, "Solicitud enviada.");
-                else showError("Error: El usuario no existe o ya hay una solicitud pendiente.");
+                if (success) {
+                    JOptionPane.showMessageDialog(this, "Solicitud de amistad enviada correctamente.");
+                } else {
+                    // Mensaje más específico para solicitudes duplicadas o usuario inexistente
+                    showError("No se pudo enviar la solicitud. El usuario no existe o ya hay una solicitud pendiente.");
+                }
             } catch (RemoteException e) {
                 showError("Error al enviar solicitud: " + e.getMessage());
             }
+        } else {
+            showError("El nombre del usuario no puede estar vacío.");
         }
     }
+
 
     private void manageFriendRequests() {
         try {
@@ -246,14 +296,25 @@ public class ChatClientApp extends JFrame {
                     JOptionPane.PLAIN_MESSAGE, null, requests.toArray(), null);
 
             if (selectedRequest != null) {
-                Client.getServer().aceptarAmistad(selectedRequest, username);
-                JOptionPane.showMessageDialog(this, "Solicitud aceptada. " + selectedRequest + " es tu amigo.");
-                actualizarAmigos();
+                // Aceptar la solicitud en el servidor
+                boolean success = Client.getServer().aceptarAmistad(selectedRequest, username);
+
+                if (success) {
+                    JOptionPane.showMessageDialog(this, "Solicitud aceptada. " + selectedRequest + " es tu amigo.");
+
+                    // Actualizar lista de amigos y solicitudes pendientes
+                    actualizarAmigos();
+                    List<String> updatedRequests = Client.getServer().obtenerSolicitudesPendientes(username);
+                    updatePendingRequests(updatedRequests.toArray(new String[0]));
+                } else {
+                    showError("Error al aceptar la solicitud.");
+                }
             }
         } catch (RemoteException e) {
             showError("Error al gestionar solicitudes: " + e.getMessage());
         }
     }
+
 
     public void actualizarAmigos() {
         try {
@@ -311,6 +372,11 @@ public class ChatClientApp extends JFrame {
         }
     }
 
+
+    // Metemos el método de hasheo con BCrypt porque mete el salt automáticamente
+    private String hashPassword(String password) {
+        return BCrypt.hashpw(password, BCrypt.gensalt());
+    }
 
     public void showRegisterDialog(ServerInterface server) {
         JTextField usernameField = new JTextField();
