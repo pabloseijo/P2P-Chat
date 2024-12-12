@@ -1,48 +1,95 @@
 package client;
 
+import javax.swing.*;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.List;
 
 public class MessageHandlerImpl extends UnicastRemoteObject implements MessageHandlerInterface {
 
-    //Constructor
-    public MessageHandlerImpl() throws RemoteException {
+    private final ChatClientApp chatApp;
+
+    public MessageHandlerImpl(ChatClientApp chatApp) throws RemoteException {
         super();
+        this.chatApp = chatApp;
     }
 
-    //probablemente haya que añadir getters para nombres y otras cosas.
-
+    @Override
+    public void recibirMensaje(String mensaje, String usuarioEnvia) throws RemoteException {
+        SwingUtilities.invokeLater(() -> {
+            chatApp.agregarMensajeAConversacion(usuarioEnvia, usuarioEnvia + ": " + mensaje);
+            if (usuarioEnvia.equals(chatApp.getUsuarioSeleccionado())) {
+                chatApp.actualizarChatArea();
+            }
+        });
+    }
 
 
     @Override
-    public void recibirMensaje(String mensaje, String usuarioEnvia) throws RemoteException{ //TODO: vamos a tener que poner quien lo manda:
-        System.out.println("\nTe ha llegado un nuevo mensaje de " + usuarioEnvia + ":\n");
-        System.out.println(mensaje);
+    public void serNotificadoUsuariosConectados(List<String> listaUsuariosConectados) throws RemoteException {
+        SwingUtilities.invokeLater(() -> {
+            chatApp.updateOnlineUsers(listaUsuariosConectados.toArray(new String[0]));
+            chatApp.addMessage("La lista de usuarios conectados ha sido actualizada.");
+        });
     }
 
-    //Ser notificado usuarios conectados:
-    @Override
-    public void serNotificadoUsuariosConectados(List<String> listaUsuariosConectados) throws RemoteException{
-        // Imprimir el encabezado
-        System.out.println("Usuarios online actualmente:");
 
-        // Imprimir cada usuario de la lista
-        for (String usuario : listaUsuariosConectados) {
-            System.out.println("- " + usuario);
+    @Override
+    public void serNotificadoNuevoUsuario(String nombreCliente) throws RemoteException {
+        SwingUtilities.invokeLater(() -> {
+            chatApp.addMessage("Nuevo usuario conectado: " + nombreCliente);
+            // Solicitar la lista completa de usuarios conectados al servidor
+            try {
+                List<String> listaUsuariosActualizados = Client.getServer().obtenerClientesConectadosList();
+                chatApp.updateOnlineUsers(listaUsuariosActualizados.toArray(new String[0]));
+            } catch (RemoteException e) {
+                chatApp.showError("Error al actualizar la lista de usuarios conectados: " + e.getMessage());
+            }
+        });
+    }
+
+    @Override
+    public void serNotificadoNuevaSolicitud(String usuarioSolicitante) throws RemoteException {
+        SwingUtilities.invokeLater(() -> {
+            chatApp.addMessage("Nueva solicitud de amistad de: " + usuarioSolicitante);
+            actualizarSolicitudesPendientes();
+        });
+    }
+
+    private void actualizarSolicitudesPendientes() {
+        try {
+            List<String> solicitudes = Client.getServer().obtenerSolicitudesPendientes(chatApp.getUsername());
+            chatApp.updatePendingRequests(solicitudes.toArray(new String[0]));
+        } catch (RemoteException e) {
+            chatApp.showError("Error al actualizar solicitudes pendientes: " + e.getMessage());
         }
+    }
 
-        // Si no hay usuarios en la lista
-        if (listaUsuariosConectados.isEmpty()) {
-            System.out.println("No hay usuarios conectados en este momento.");
+    @Override
+    public void serNotificadoNuevoAmigo(String nombreAmigo) throws RemoteException {
+        SwingUtilities.invokeLater(() -> {
+            chatApp.addMessage("¡Tienes un nuevo amigo! " + nombreAmigo + " ahora es tu amigo.");
+            actualizarListaAmigos();
+        });
+    }
+
+    // Método para actualizar la lista de usuarios conectados
+    private void actualizarListaUsuariosConectados() {
+        try {
+            List<String> usuariosConectados = Client.getServer().obtenerClientesConectadosList();
+            chatApp.updateOnlineUsers(usuariosConectados.toArray(new String[0]));
+        } catch (RemoteException e) {
+            chatApp.showError("Error al actualizar la lista de usuarios conectados: " + e.getMessage());
         }
     }
 
-    //Metodo para notificar al resto de clientes de que se conecto un cliente, es un metodo RMI del cliente:
-    @Override
-    public void serNotificadoNuevoUsuario(String nombreCliente){
-        System.out.println("Nuevo usuario online: " + nombreCliente);
+    // Método para actualizar la lista de amigos
+    private void actualizarListaAmigos() {
+        try {
+            List<String> listaAmigos = Client.getServer().obtenerListaAmigos(chatApp.getUsername());
+            chatApp.updateFriendsList(listaAmigos.toArray(new String[0]));
+        } catch (RemoteException e) {
+            chatApp.showError("Error al actualizar la lista de amigos: " + e.getMessage());
+        }
     }
-
-
 }

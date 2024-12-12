@@ -6,13 +6,17 @@ import java.util.List;
 
 public interface MessageHandlerInterface extends Remote {
 
-    //Métodos para mensajería:
+    // Métodos para mensajería
     void recibirMensaje(String mensaje, String usuarioEnvia) throws RemoteException;
 
-    //Ser notificado usuarios conectados:
+    // Notificación de usuarios conectados
     void serNotificadoUsuariosConectados(List<String> listaUsuariosConectados) throws RemoteException;
 
-    //Metodo para notificar al resto de clientes de que se conecto un cliente, es un metodo RMI del cliente:
+    // Notificación de un nuevo usuario conectado
     void serNotificadoNuevoUsuario(String nombreCliente) throws RemoteException;
 
+    // Notificación de un nuevo amigo
+    void serNotificadoNuevoAmigo(String nombreAmigo) throws RemoteException; // Nuevo método
+
+    void serNotificadoNuevaSolicitud(String usuarioSolicitante) throws RemoteException;
 }
